@@ -1,7 +1,6 @@
 ---
 # defaults file for role-keepalive
 keepalive__floating_ip: 10.211.55.160
-keepalive__floating_ip2: 10.211.55.161
 keepalive__config_file: "/etc/keepalived/keepalived.conf"
 keepalive__required_packages:
   - build-essential
@@ -25,10 +24,10 @@ keepalive__instances:
     authentication:
       auth_type: keepalived
       auth_pass: "password!"
-    unicast_src_ip: "{{ ansible_default_ipv4.address }}" # 10.211.55.151 olacak cıktısı
+    unicast_src_ip: "{{ ansible_default_ipv4.address }}" # current host IP address i.e. 10.211.55.151
     unicast_peer:
-      - 10.211.55.152 # 10.211.55.152 olacak cıktısı
-      - 10.211.55.153 # 10.211.55.153 olacak cıktısı
+      - 10.211.55.152 # peer IP address i.e. 10.211.55.152
+      - 10.211.55.153 # peer IP address i.e. 10.211.55.153
     virtual_ipaddress:
       - "{{ keepalive__floating_ip }}"
     track_script: "{{ keepalive__vrrp_script[0].vrrp_script }}"
