@@ -1,0 +1,34 @@
+---
+# defaults file for role-keepalive
+keepalive__floating_ip: 10.211.55.160
+keepalive__floating_ip2: 10.211.55.161
+keepalive__config_file: "/etc/keepalived/keepalived.conf"
+keepalive__required_packages:
+  - build-essential
+  - libssl-dev
+  - keepalived
+
+keepalive__vrrp_script:
+  - &vrrp_instance
+    vrrp_script: chk_haproxy
+    script: "/usr/bin/killall -0 haproxy"
+    interval: 2
+    weight: 2
+
+keepalive__instances:
+  - &instance
+    state: "MASTER"
+    name: LB_VIP
+    interface: "enp0s5"
+    priority: 101
+    virtual_router_id: 51
+    authentication:
+      auth_type: keepalived
+      auth_pass: "password!"
+    unicast_src_ip: "{{ ansible_default_ipv4.address }}" # 10.211.55.151 olacak cıktısı
+    unicast_peer:
+      - 10.211.55.152 # 10.211.55.152 olacak cıktısı
+      - 10.211.55.153 # 10.211.55.153 olacak cıktısı
+    virtual_ipaddress:
+      - "{{ keepalive__floating_ip }}"
+    track_script: "{{ keepalive__vrrp_script[0].vrrp_script }}"

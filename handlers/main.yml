@@ -1,0 +1,7 @@
+---
+# handlers file for role-keepalive
+
+- name: restart keepalived
+  systemd:
+    service: keepalived
+    state: restarted

@@ -1,0 +1,11 @@
+---
+
+- name: Check system
+  ansible.builtin.assert:
+    that:
+      - ansible_system in ['Linux']
+      - ansible_architecture in ['x86_64', 'aarch64']
+      - ansible_distribution in ['Ubuntu']
+      - ansible_distribution_major_version in ['20']
+    fail_msg: Only aarch64 and x86_64 Ubuntu Linux/versions 20.04 are supported
+    quiet: true

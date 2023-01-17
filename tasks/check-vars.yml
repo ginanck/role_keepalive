@@ -1,0 +1,24 @@
+---
+
+- name: Save variable in hostvars (required for next step)
+  set_fact:
+    hostname__hostname: "{{ hostname__hostname }}"
+
+- name: Check that hostname__hostname is unique
+  assert:
+    that:
+      - groups['hostname']
+        | map('extract', hostvars, 'hostname__hostname')
+        | list
+        | unique
+        | count
+        == groups['hostname'] | count
+    fail_msg: "hostname__hostname must be unique among all hosts"
+    quiet: true
+
+- name: Check hostname__ip_address
+  assert:
+    that:
+      - hostname__ip_address == hostname__ip_address | ipaddr
+    fail_msg: "hostname__ip_address is not a valid address: {{ hostname__ip_address }}"
+    quiet: true
