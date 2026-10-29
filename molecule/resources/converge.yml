@@ -4,7 +4,7 @@
   become: true
   gather_facts: true
   vars:
-    keepalive_auth_pass: "molecule-vrrp-secret"
+    keepalive_auth_pass: "molvrrp1"
     keepalive__floating_ip: "192.0.2.100"
     _cluster_addresses: "{{ groups['all'] | map('extract', hostvars) | map(attribute='ansible_default_ipv4') | map(attribute='address') | list }}"
     keepalive__instances:
@@ -13,6 +13,11 @@
         interface: "{{ ansible_default_ipv4.interface }}"
         priority: "{{ 150 if inventory_hostname == groups['all'][0] else 100 }}"
         virtual_router_id: 51
+        advert_int: 1
+        preempt: true
+        use_vmac: false
+        track_interface:
+          - lo
         authentication:
           auth_type: PASS
           auth_pass: "{{ keepalive_auth_pass }}"
@@ -21,6 +26,22 @@
         virtual_ipaddress:
           - "{{ keepalive__floating_ip }}"
         track_script: chk_always
+    keepalive__global_defs:
+      router_id: "{{ inventory_hostname }}"
+      enable_script_security: true
+    keepalive__advert_int: 1
+    keepalive__notify_scripts:
+      master: /etc/keepalived/notify.sh
+    keepalive__scripts:
+      - name: chk_placeholder.sh
+        src: files/chk_placeholder.sh
+    keepalive__virtual_servers:
+      - name: web
+        ip: 192.0.2.101
+        port: 80
+        real_servers:
+          - ip: 192.0.2.11
+            port: 80
     keepalive__vrrp_script:
       - vrrp_script: chk_always
         script: "/bin/true"

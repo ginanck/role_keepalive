@@ -20,3 +20,40 @@
   loop_control:
     label: "{{ item.name }}"
   no_log: true
+
+- name: Assert the router id is set
+  ansible.builtin.assert:
+    that:
+      - keepalive__global_defs.router_id | default('') | length > 0
+    fail_msg: "keepalive__global_defs.router_id must be set (it identifies the node in logs)"
+    quiet: true
+
+- name: Assert the VRRP secret respects the protocol length limit
+  ansible.builtin.assert:
+    that:
+      - keepalive_auth_pass | length <= 8
+    fail_msg: >-
+      keepalived truncates VRRP secrets longer than 8 characters; shorten
+      keepalive_auth_pass so every node authenticates with the same value.
+    quiet: true
+  no_log: true
+
+- name: Assert the health check scripts exist
+  ansible.builtin.stat:
+    path: "{{ role_path }}/{{ item.src }}"
+  loop: "{{ keepalive__scripts }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: keepalive_script_sources
+  delegate_to: localhost
+  become: false
+
+- name: Fail when a declared script source is missing
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "script source for {{ item.item.name }} does not exist"
+    quiet: true
+  loop: "{{ keepalive_script_sources.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"

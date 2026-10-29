@@ -7,5 +7,13 @@
 - name: Check Variables
   ansible.builtin.include_tasks: check-vars.yml
 
+- name: Configure Kernel Prerequisites
+  ansible.builtin.include_tasks: sysctl.yml
+  when: keepalive__manage_sysctl | bool
+
+- name: Configure Firewall Rules
+  ansible.builtin.include_tasks: firewall.yml
+  when: keepalive__manage_firewall | bool
+
 - name: Configure Keepalived
   ansible.builtin.include_tasks: configure.yml

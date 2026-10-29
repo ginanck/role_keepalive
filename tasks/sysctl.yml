@@ -1,0 +1,26 @@
+---
+
+- name: Ensure the sysctl configuration directory exists
+  ansible.builtin.file:
+    path: /etc/sysctl.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Allow binding to non-local addresses for the virtual address
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-keepalived.conf
+    content: |
+      # {{ ansible_managed | default('Ansible managed') }}
+      net.ipv4.ip_nonlocal_bind = 1
+    owner: root
+    group: root
+    mode: '0644'
+  register: keepalived_sysctl
+
+- name: Apply the kernel setting
+  ansible.builtin.command:
+    cmd: sysctl --system
+  changed_when: keepalived_sysctl is changed
+  when: keepalived_sysctl is changed

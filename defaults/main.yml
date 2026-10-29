@@ -6,31 +6,63 @@ keepalive__required_packages:
   - keepalived
 
 # Shared VRRP authentication secret. Set keepalive_auth_pass from the vault.
-# No default is shipped: an empty value fails the pre-flight assert.
+# keepalived truncates secrets longer than 8 characters, so the check asserts the bound.
 keepalive_auth_pass: ""
+
+# Global daemon settings
+keepalive__global_defs:
+  router_id: "{{ inventory_hostname }}"
+  enable_script_security: true
+  notification_email: []
+  smtp_server: ""
+  notification_email_from: ""
+
+# Timing shared by every instance unless overridden per instance
+keepalive__advert_int: 1
+
+# Optional hook scripts, rendered per instance by name: {master: path, backup: path, fault: path}
+keepalive__notify_scripts: {}
+
+# sync group name applied to every instance when set
+keepalive__sync_group: ""
+
+# Health check scripts to distribute into /etc/keepalived: [{name: chk_haproxy.sh, src: files/chk_haproxy.sh}]
+keepalive__scripts: []
+
+# Validate the configuration before replacing the live file (requires keepalived -t support)
+keepalive__validate_config: true
+
+# Kernel and firewall prerequisites
+keepalive__manage_sysctl: true
+keepalive__manage_firewall: false
+
+# LVS virtual servers: [{name, ip, port, protocol, real_servers: [{ip, port}]}]
+keepalive__virtual_servers: []
 
 # A failed check must lower the priority, so the delta is negative.
 keepalive__vrrp_script:
-  - &vrrp_instance
-    vrrp_script: chk_haproxy
+  - vrrp_script: chk_haproxy
     script: "/usr/bin/systemctl is-active --quiet haproxy"
     interval: 2
     weight: -20
+    rise: 2
+    fall: 3
 
 keepalive__instances:
-  - &instance
-    state: "MASTER"
+  - state: "MASTER"
     name: LB_VIP
     interface: "enp0s5"
     priority: 101
     virtual_router_id: 51
+    advert_int: "{{ keepalive__advert_int }}"
+    preempt: true
     authentication:
       auth_type: PASS
       auth_pass: "{{ keepalive_auth_pass }}"
-    unicast_src_ip: "{{ ansible_default_ipv4.address }}" # current host IP address
+    unicast_src_ip: "{{ ansible_default_ipv4.address }}"
     unicast_peer:
-      - 10.211.55.152 # peer IP address
-      - 10.211.55.153 # peer IP address
+      - 10.211.55.152
+      - 10.211.55.153
     virtual_ipaddress:
       - "{{ keepalive__floating_ip }}"
     track_script: "{{ keepalive__vrrp_script[0].vrrp_script }}"

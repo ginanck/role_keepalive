@@ -48,3 +48,31 @@ An optional section for the role authors to include contact information, or a we
   it survives a reboot.
 - Debian and RedHat families are supported through the generic package module; the pre-flight
   check rejects other families with a message that names what was detected.
+
+## Operational options
+
+- `keepalive__global_defs` sets the router id, script security and optional SMTP alerts.
+- `keepalive__advert_int`, per-instance `advert_int`, `preempt`, `use_vmac`, `track_interface`,
+  `keepalive__track_interface` and `keepalive__sync_group` control timing and tracking.
+- `keepalive__notify_scripts` maps `master`, `backup` and `fault` to hook scripts.
+- `keepalive__scripts` distributes health check scripts to `/etc/keepalived` with mode `0750`.
+- `keepalive__manage_sysctl` persists `net.ipv4.ip_nonlocal_bind`;
+  `keepalive__manage_firewall` allows VRRP through firewalld or ufw.
+- `keepalive__validate_config` runs `keepalived -t` on a staged file before it replaces the live
+  configuration.
+- `keepalive__virtual_servers` renders LVS `virtual_server` blocks.
+
+## Molecule scenarios
+
+- `default` and `rockylinux-9` run on the Rocky Linux 9 image; `rockylinux-8` targets Rocky Linux 8.
+- Run them with the mitogen strategy disabled, otherwise Ansible hangs against the local Docker socket:
+
+  ```sh
+  env -u ANSIBLE_STRATEGY -u ANSIBLE_STRATEGY_PLUGINS molecule test
+  env -u ANSIBLE_STRATEGY -u ANSIBLE_STRATEGY_PLUGINS molecule test -s rockylinux-8
+  ```
+
+- The Rocky Linux 8 image ships Python 3.6 only; ansible-core 2.21 cannot execute modules on a
+  3.6 target, so the `rockylinux-8` scenario needs an image with Python 3.8 or newer.
+- The role dependencies are taken from the checked-out `../role_base` sibling, so local changes to
+  the base role are exercised by the scenarios.

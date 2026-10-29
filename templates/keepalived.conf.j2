@@ -1,48 +1,113 @@
 {{ ansible_managed | comment }}
 
-{% if keepalive__vrrp_script is defined %}
-    {% for item in keepalive__vrrp_script %}
-vrrp_script {{ item.vrrp_script }} { 
+global_defs {
+    router_id {{ keepalive__global_defs.router_id }}
+{% if keepalive__global_defs.enable_script_security | default(false) %}
+    enable_script_security
+    script_user root
+{% endif %}
+{% if keepalive__global_defs.notification_email | default([]) | length > 0 %}
+    notification_email {
+{% for address in keepalive__global_defs.notification_email %}
+        {{ address }}
+{% endfor %}
+    }
+    notification_email_from {{ keepalive__global_defs.notification_email_from }}
+    smtp_server {{ keepalive__global_defs.smtp_server }}
+{% endif %}
+}
+
+{% for item in keepalive__vrrp_script %}
+vrrp_script {{ item.vrrp_script }} {
     script "{{ item.script }}"
     interval {{ item.interval }}
     weight {{ item.weight }}
-}
-    {% endfor %}
+{% if item.rise is defined %}
+    rise {{ item.rise }}
 {% endif %}
+{% if item.fall is defined %}
+    fall {{ item.fall }}
+{% endif %}
+}
+{% endfor %}
 
-{% if keepalive__instances is defined %}
-    {% for item in keepalive__instances %}
+{% for item in keepalive__instances %}
 vrrp_instance {{ item.name }} {
     interface {{ item.interface }}
     state {{ item.state }}
     priority {{ item.priority }}
     virtual_router_id {{ item.virtual_router_id }}
+{% if item.advert_int is defined %}
+    advert_int {{ item.advert_int }}
+{% endif %}
+{% if item.preempt is defined %}
+    preempt {{ 'on' if item.preempt | bool else 'off' }}
+{% endif %}
+{% if item.use_vmac | default(false) %}
+    use_vmac
+{% endif %}
+{% if item.track_interface is defined and item.track_interface | length > 0 %}
+    track_interface {
+{% for interface in item.track_interface %}
+        {{ interface }}
+{% endfor %}
+    }
+{% endif %}
 
     authentication {
         auth_type {{ item.authentication.auth_type }}
         auth_pass {{ item.authentication.auth_pass }}
     }
 
-    unicast_src_ip {{ item.unicast_src_ip }} # Private IP address of master
+    unicast_src_ip {{ item.unicast_src_ip }}
     unicast_peer {
-        {% for peer in item.unicast_peer %}
-        {{ peer }} # Private IP address of a peer node
-        {% endfor %}
+{% for peer in item.unicast_peer %}
+        {{ peer }}
+{% endfor %}
     }
 
-    # The virtual ip address shared between the three loadbalancers
     virtual_ipaddress {
-        {% for item in item.virtual_ipaddress %}
-        {{ item }} # Private IP address of the backup server
-        {% endfor %}
+{% for address in item.virtual_ipaddress %}
+        {{ address }}
+{% endfor %}
     }
 
 {% if item.track_script is defined %}
-    # Use the defined script to decide whether this node keeps the address
     track_script {
         {{ item.track_script }}
     }
 {% endif %}
+{% for hook in ['master', 'backup', 'fault'] %}
+{% if keepalive__notify_scripts[hook] is defined %}
+    notify_{{ hook }} "{{ keepalive__notify_scripts[hook] }}"
+{% endif %}
+{% endfor %}
 }
-    {% endfor %}
+{% endfor %}
+
+{% for server in keepalive__virtual_servers %}
+virtual_server {{ server.ip }} {{ server.port }} {
+    delay_loop 6
+    lb_algo {{ server.lb_algo | default('rr') }}
+    lb_kind {{ server.lb_kind | default('DR') }}
+    protocol {{ server.protocol | default('TCP') }}
+{% for real in server.real_servers %}
+    real_server {{ real.ip }} {{ real.port }} {
+        weight 1
+        TCP_CHECK {
+            connect_timeout 3
+        }
+    }
+{% endfor %}
+}
+{% endfor %}
+
+{% if keepalive__sync_group | length > 0 %}
+vrrp_sync_group {{ keepalive__sync_group }} {
+    group {
+{% for item in keepalive__instances %}
+        {{ item.name }}
+{% endfor %}
+    }
+}
 {% endif %}

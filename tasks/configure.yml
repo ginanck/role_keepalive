@@ -5,17 +5,69 @@
     name: "{{ keepalive__required_packages }}"
     state: present
 
-- name: Render the keepalived configuration
+- name: Distribute the declared health check scripts
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "/etc/keepalived/{{ item.name }}"
+    owner: root
+    group: root
+    mode: '0750'
+  loop: "{{ keepalive__scripts }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify:
+    - restart keepalived
+
+- name: Create the keepalived configuration directory for staging
+  ansible.builtin.file:
+    path: "{{ keepalive__config_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render the keepalived configuration to the staging path
   ansible.builtin.template:
     src: keepalived.conf.j2
-    dest: "{{ keepalive__config_file }}"
+    dest: "{{ keepalive__config_file }}.staged"
     owner: root
     group: root
     mode: '0640'
     lstrip_blocks: true
   no_log: true
+
+- name: Validate the staged keepalived configuration
+  ansible.builtin.command:
+    cmd: "keepalived -t -f {{ keepalive__config_file }}.staged"
+  changed_when: false
+  when: keepalive__validate_config | bool
+
+- name: Install the validated keepalived configuration
+  ansible.builtin.copy:
+    src: "{{ keepalive__config_file }}.staged"
+    dest: "{{ keepalive__config_file }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0640'
+  no_log: true
   notify:
     - restart keepalived
+
+- name: Install the keepalived log rotation policy
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/keepalived
+    content: |
+      /var/log/keepalived.log {
+          weekly
+          rotate 4
+          compress
+          missingok
+          notifempty
+      }
+    owner: root
+    group: root
+    mode: '0644'
 
 - name: Ensure keepalived is enabled and running
   ansible.builtin.systemd:

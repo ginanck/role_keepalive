@@ -30,6 +30,39 @@
           - "'weight -20' in (keepalived_cfg.content | b64decode)"
         fail_msg: "the configuration must use PASS authentication and a negative weight"
 
+    - name: test_ac8_global_and_timing_settings
+      ansible.builtin.assert:
+        that:
+          - "'router_id' in (keepalived_cfg.content | b64decode)"
+          - "'advert_int 1' in (keepalived_cfg.content | b64decode)"
+          - "'track_interface' in (keepalived_cfg.content | b64decode)"
+          - "'notify_master' in (keepalived_cfg.content | b64decode)"
+        fail_msg: "global, timing, tracking and hook settings must be rendered"
+
+    - name: test_ac10_instance_options
+      ansible.builtin.assert:
+        that:
+          - "'preempt on' in (keepalived_cfg.content | b64decode)"
+        fail_msg: "preemption must follow the declared value"
+
+    - name: test_ac11_virtual_server
+      ansible.builtin.assert:
+        that:
+          - "'virtual_server 192.0.2.101 80' in (keepalived_cfg.content | b64decode)"
+        fail_msg: "declared virtual servers must be rendered"
+
+    - name: test_ac12_script_distributed
+      ansible.builtin.stat:
+        path: /etc/keepalived/chk_placeholder.sh
+      register: keepalive_script
+
+    - name: test_ac12_assert_script_mode
+      ansible.builtin.assert:
+        that:
+          - keepalive_script.stat.exists
+          - keepalive_script.stat.mode == '0750'
+        fail_msg: "declared health check scripts must be distributed with mode 0750"
+
     - name: test_ac5_secret_is_not_logged_or_default
       ansible.builtin.assert:
         that:

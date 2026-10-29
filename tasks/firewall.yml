@@ -1,0 +1,15 @@
+---
+
+- name: Allow VRRP traffic through firewalld
+  ansible.posix.firewalld:
+    rich_rule: 'rule protocol value="vrrp" accept'
+    permanent: true
+    immediate: true
+    state: enabled
+  when: ansible_os_family == 'RedHat'
+
+- name: Allow VRRP traffic through ufw
+  community.general.ufw:
+    rule: allow
+    proto: vrrp
+  when: ansible_os_family == 'Debian'
