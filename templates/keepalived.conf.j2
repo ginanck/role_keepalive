@@ -25,10 +25,10 @@ vrrp_instance {{ item.name }} {
 
     unicast_src_ip {{ item.unicast_src_ip }} # Private IP address of master
     unicast_peer {
-        {% for item in item.unicast_peer %}
-        {{ item }} # Private IP address of the backup server
+        {% for peer in item.unicast_peer %}
+        {{ peer }} # Private IP address of a peer node
         {% endfor %}
-   }
+    }
 
     # The virtual ip address shared between the three loadbalancers
     virtual_ipaddress {
@@ -37,10 +37,12 @@ vrrp_instance {{ item.name }} {
         {% endfor %}
     }
 
-    # Use the Defined Script to Check whether to initiate a fail over
+{% if item.track_script is defined %}
+    # Use the defined script to decide whether this node keeps the address
     track_script {
         {{ item.track_script }}
     }
+{% endif %}
 }
     {% endfor %}
 {% endif %}

@@ -2,10 +2,10 @@
 # tasks file for role-keepalive
 
 - name: Check System
-  include_tasks: check-system.yml
+  ansible.builtin.include_tasks: check-system.yml
 
-# - name: Check Variables
-#   include_tasks: check-vars.yml
+- name: Check Variables
+  ansible.builtin.include_tasks: check-vars.yml
 
-- name: Configure Hostname
-  include_tasks: configure.yml
+- name: Configure Keepalived
+  ansible.builtin.include_tasks: configure.yml

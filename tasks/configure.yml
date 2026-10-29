@@ -1,17 +1,24 @@
 ---
 
-- name: install keepalived packages
-  ansible.builtin.apt:
+- name: Install keepalived packages
+  ansible.builtin.package:
     name: "{{ keepalive__required_packages }}"
     state: present
 
-- name: generate {{ keepalive__config_file }}
-  template:
+- name: Render the keepalived configuration
+  ansible.builtin.template:
     src: keepalived.conf.j2
     dest: "{{ keepalive__config_file }}"
     owner: root
     group: root
-    mode: 0644
-    lstrip_blocks: yes
+    mode: '0640'
+    lstrip_blocks: true
+  no_log: true
   notify:
     - restart keepalived
+
+- name: Ensure keepalived is enabled and running
+  ansible.builtin.systemd:
+    name: keepalived
+    state: started
+    enabled: true

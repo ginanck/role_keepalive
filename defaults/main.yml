@@ -3,16 +3,19 @@
 keepalive__floating_ip: 10.211.55.160
 keepalive__config_file: "/etc/keepalived/keepalived.conf"
 keepalive__required_packages:
-  - build-essential
-  - libssl-dev
   - keepalived
 
+# Shared VRRP authentication secret. Set keepalive_auth_pass from the vault.
+# No default is shipped: an empty value fails the pre-flight assert.
+keepalive_auth_pass: ""
+
+# A failed check must lower the priority, so the delta is negative.
 keepalive__vrrp_script:
   - &vrrp_instance
     vrrp_script: chk_haproxy
-    script: "/usr/bin/killall -0 haproxy"
+    script: "/usr/bin/systemctl is-active --quiet haproxy"
     interval: 2
-    weight: 2
+    weight: -20
 
 keepalive__instances:
   - &instance
@@ -22,12 +25,12 @@ keepalive__instances:
     priority: 101
     virtual_router_id: 51
     authentication:
-      auth_type: keepalived
-      auth_pass: "password!"
-    unicast_src_ip: "{{ ansible_default_ipv4.address }}" # current host IP address i.e. 10.211.55.151
+      auth_type: PASS
+      auth_pass: "{{ keepalive_auth_pass }}"
+    unicast_src_ip: "{{ ansible_default_ipv4.address }}" # current host IP address
     unicast_peer:
-      - 10.211.55.152 # peer IP address i.e. 10.211.55.152
-      - 10.211.55.153 # peer IP address i.e. 10.211.55.153
+      - 10.211.55.152 # peer IP address
+      - 10.211.55.153 # peer IP address
     virtual_ipaddress:
       - "{{ keepalive__floating_ip }}"
     track_script: "{{ keepalive__vrrp_script[0].vrrp_script }}"

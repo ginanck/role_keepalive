@@ -2,6 +2,7 @@
 # handlers file for role-keepalive
 
 - name: restart keepalived
-  systemd:
-    service: keepalived
+  ansible.builtin.systemd:
+    name: keepalived
     state: restarted
+    enabled: true

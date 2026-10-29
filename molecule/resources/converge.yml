@@ -1,0 +1,30 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    keepalive_auth_pass: "molecule-vrrp-secret"
+    keepalive__floating_ip: "192.0.2.100"
+    _cluster_addresses: "{{ groups['all'] | map('extract', hostvars) | map(attribute='ansible_default_ipv4') | map(attribute='address') | list }}"
+    keepalive__instances:
+      - state: "{{ 'MASTER' if inventory_hostname == groups['all'][0] else 'BACKUP' }}"
+        name: LB_VIP
+        interface: "{{ ansible_default_ipv4.interface }}"
+        priority: "{{ 150 if inventory_hostname == groups['all'][0] else 100 }}"
+        virtual_router_id: 51
+        authentication:
+          auth_type: PASS
+          auth_pass: "{{ keepalive_auth_pass }}"
+        unicast_src_ip: "{{ ansible_default_ipv4.address }}"
+        unicast_peer: "{{ _cluster_addresses | difference([ansible_default_ipv4.address]) }}"
+        virtual_ipaddress:
+          - "{{ keepalive__floating_ip }}"
+        track_script: chk_always
+    keepalive__vrrp_script:
+      - vrrp_script: chk_always
+        script: "/bin/true"
+        interval: 2
+        weight: -20
+  roles:
+    - role_keepalive

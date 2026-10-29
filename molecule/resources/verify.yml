@@ -1,0 +1,81 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    keepalive_auth_pass: "molecule-vrrp-secret"
+  tasks:
+    - name: test_ac3_service_is_enabled_and_running
+      ansible.builtin.command:
+        cmd: systemctl is-active keepalived
+      changed_when: false
+      register: keepalived_active
+
+    - name: test_ac3_assert_service_state
+      ansible.builtin.assert:
+        that:
+          - keepalived_active.stdout | trim == 'active'
+        fail_msg: "keepalived must be running"
+
+    - name: test_ac1_configuration_uses_valid_authentication
+      ansible.builtin.slurp:
+        src: /etc/keepalived/keepalived.conf
+      register: keepalived_cfg
+
+    - name: test_ac1_assert_valid_vrrp
+      ansible.builtin.assert:
+        that:
+          - "'auth_type PASS' in (keepalived_cfg.content | b64decode)"
+          - "'weight -20' in (keepalived_cfg.content | b64decode)"
+        fail_msg: "the configuration must use PASS authentication and a negative weight"
+
+    - name: test_ac5_secret_is_not_logged_or_default
+      ansible.builtin.assert:
+        that:
+          - "'password!' not in (keepalived_cfg.content | b64decode)"
+        fail_msg: "the well-known default VRRP password must not appear"
+
+    - name: test_ac1_collect_addresses
+      ansible.builtin.command:
+        cmd: ip -o addr show
+      changed_when: false
+      register: keepalive_addresses
+
+    - name: test_ac1_exactly_one_node_holds_the_address
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts | map('extract', hostvars, 'keepalive_addresses') | map(attribute='stdout') | select('search', '192.0.2.100') | list | length == 1
+        fail_msg: "exactly one node must hold the virtual address"
+      run_once: true
+
+    - name: test_ac2_stop_keepalived_on_master
+      ansible.builtin.systemd:
+        name: keepalived
+        state: stopped
+      when: inventory_hostname == groups['all'][0]
+
+    - name: test_ac2_wait_for_failover
+      ansible.builtin.pause:
+        seconds: 8
+      when: inventory_hostname == groups['all'][0]
+
+    - name: test_ac2_collect_addresses_after_failover
+      ansible.builtin.command:
+        cmd: ip -o addr show
+      changed_when: false
+      register: failover_addresses
+
+    - name: test_ac2_assert_peer_took_the_address
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts | select('ne', groups['all'][0]) | map('extract', hostvars, 'failover_addresses') | map(attribute='stdout') | select('search', '192.0.2.100') | list | length == 1
+        fail_msg: "the peer must take the virtual address when the master stops"
+      run_once: true
+
+    - name: test_ac2_restore_keepalived_on_master
+      ansible.builtin.systemd:
+        name: keepalived
+        state: started
+        enabled: true
+      when: inventory_hostname == groups['all'][0]

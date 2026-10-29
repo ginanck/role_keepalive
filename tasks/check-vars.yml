@@ -1,24 +1,22 @@
 ---
 
-- name: Save variable in hostvars (required for next step)
-  set_fact:
-    hostname__hostname: "{{ hostname__hostname }}"
-
-- name: Check that hostname__hostname is unique
-  assert:
+- name: Assert the VRRP authentication secret comes from the vault
+  ansible.builtin.assert:
     that:
-      - groups['hostname']
-        | map('extract', hostvars, 'hostname__hostname')
-        | list
-        | unique
-        | count
-        == groups['hostname'] | count
-    fail_msg: "hostname__hostname must be unique among all hosts"
+      - keepalive_auth_pass | default('') | length > 0
+    fail_msg: >-
+      keepalive_auth_pass is empty. Provide it from the vault; VRRP authentication
+      must not use a literal or empty password.
     quiet: true
 
-- name: Check hostname__ip_address
-  assert:
+- name: Assert every instance uses a valid authentication type
+  ansible.builtin.assert:
     that:
-      - hostname__ip_address == hostname__ip_address | ipaddr
-    fail_msg: "hostname__ip_address is not a valid address: {{ hostname__ip_address }}"
-    quiet: true
+      - item.authentication.auth_type in ['PASS', 'AH']
+    fail_msg: >-
+      Instance {{ item.name }} uses auth_type {{ item.authentication.auth_type }};
+      keepalived accepts PASS or AH.
+  loop: "{{ keepalive__instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
